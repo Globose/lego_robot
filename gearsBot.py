@@ -34,9 +34,11 @@ def standardize(color_left, color_right, color_current):
 def velocity_fn(x, base_velocity, steering_offset):
     """Calculates left and right velocity"""
     velocity_left = (min(base_velocity, base_velocity+2*base_velocity*x) +
-                     x*base_velocity*min(steering_offset, 0))
+                     x*base_velocity*min(steering_offset, 0) +
+                        0.4*base_velocity*min(0, x))
     velocity_right = (min(base_velocity, base_velocity-2*base_velocity*x) +
-                      x*base_velocity*max(steering_offset, 0))
+                      x*base_velocity*max(steering_offset, 0) -
+                        0.4*base_velocity*max(0, x))
     return (velocity_left, velocity_right)
 
 
@@ -65,14 +67,13 @@ def drive_forward(color_left, color_right, velocity):
         if new_distance > distance:
             break
         wait(200)
-    # ev wait(300)
 
 
 def main():
     """Main Function"""
-    color_left, color_right = 0, 100
-    base_velocity = 200
-    steering_offset = 1
+    color_left, color_right = 100, 0
+    base_velocity = 300
+    steering_offset = -1
     drive_forward(color_left, color_right, (base_velocity, base_velocity))
 
     while True:
