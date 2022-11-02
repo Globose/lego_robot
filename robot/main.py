@@ -1,29 +1,24 @@
 #!/usr/bin/env pybricks-micropython
 import time
-from pybricks import robotics
 from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import Motor, ColorSensor, UltrasonicSensor
-from pybricks.parameters import Port, Stop, Direction, Color
+from pybricks.parameters import Port 
 from pybricks.tools import wait
-from pybricks.robotics import DriveBase
 
 # Robot definition
 ev3 = EV3Brick()
 
 # Motor definitions
-motorA = Motor(Port.B)
-motorB = Motor(Port.C)
-left_motor = motorA
-right_motor = motorB
-# robot = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=152)
-# robot = DriveBase(left_motor, right_motor, wheel_diameter=55.5, axle_track=104)
+left_motor = Motor(Port.A)
+right_motor = Motor(Port.B)
 
 # Sensor definitions
-left_light = ColorSensor(Port.S3) # S3
-obstacle_sensor = UltrasonicSensor(Port.S4) # S4
-right_light = ColorSensor(Port.S2) # S2
+left_light = ColorSensor(Port.S1)  # S3
+obstacle_sensor = UltrasonicSensor(Port.S2)  # S4
+right_light = ColorSensor(Port.S3)  # S2
 
 # Here is where your code starts
+
 
 def norm(color_left, color_right, color_current):
     """Returns a number between -1 and 1
@@ -32,7 +27,7 @@ def norm(color_left, color_right, color_current):
     t = (color_current-min(color_left, color_right) -
          .5*abs(color_left-color_right))
     t = (2*t)/(color_left-color_right)
-    t *= 0.5
+    t = (t**3+t)/2
     return t
 
 
@@ -105,7 +100,9 @@ def parking_mode(steering_offset_inv, color_line, color_base):
         wait(3000)
         back(color_line, color_base)
     else:
-        drive_robot((0,0))
+        drive_robot((0, 150))
+        wait(150)
+
 
 def calibrate():
     """Calibrates the color sensor"""
@@ -116,29 +113,33 @@ def calibrate():
     wait(2000)
     return color_left, color_right
 
+
+def light_on_line(color_line, color_base, light):
+    return abs(light.reflection()-color_line) < abs(light.reflection()-color_base)
+
+
 def main():
     """Main Function"""
-    color_left, color_right = calibrate()
-    #print(color_left,color_right)
-    #return
+    color_left, color_right = 0, 100  # calibrate()
 
-    base_velocity = 180
+    base_velocity = 200
     steering_offset = 0
+
     drive_to_line(color_left, color_right, right_light, (180, 180))
     timer = time.time()
-    
+
     while True:
-        distance = obstacle_sensor.distance()
-        velocity = base_velocity*min(1,((distance-100)/200))
-        
+        distance = obstacle_sensor.distance()*10
+        velocity = base_velocity*min(1, ((distance-100)/200))
+
         vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), velocity, steering_offset)
         drive_robot(vel)
-        
-        if abs(left_light.reflection()-color_left) < abs(left_light.reflection()-color_right) and time.time()-timer > 3:
+
+        if light_on_line(color_left, color_right, left_light) and time.time()-timer > 3:
             parking_mode(-steering_offset, color_left, color_right)
             drive_to_line(color_left, color_right, right_light, (200, 200))
             timer = time.time()
 
+
 if __name__ == '__main__':
     main()
-    
