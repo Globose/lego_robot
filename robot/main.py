@@ -11,17 +11,17 @@ from pybricks.robotics import DriveBase
 ev3 = EV3Brick()
 
 # Motor definitions
-motorA = Motor(Port.A)
-motorB = Motor(Port.B)
+motorA = Motor(Port.B)
+motorB = Motor(Port.C)
 left_motor = motorA
 right_motor = motorB
-robot = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=152)
-#robot = DriveBase(left_motor, right_motor, wheel_diameter=55.5, axle_track=104)
+# robot = DriveBase(left_motor, right_motor, wheel_diameter=56, axle_track=152)
+# robot = DriveBase(left_motor, right_motor, wheel_diameter=55.5, axle_track=104)
 
 # Sensor definitions
-left_light = ColorSensor(Port.S1) # S3
-obstacle_sensor = UltrasonicSensor(Port.S2) # S4
-right_light = ColorSensor(Port.S3) # S2
+left_light = ColorSensor(Port.S3) # S3
+obstacle_sensor = UltrasonicSensor(Port.S4) # S4
+right_light = ColorSensor(Port.S2) # S2
 
 # Here is where your code starts
 
@@ -31,17 +31,17 @@ def norm(color_left, color_right, color_current):
     """
     t = (color_current-min(color_left, color_right) -
          .5*abs(color_left-color_right))
-    return (2*t)/(color_left-color_right)
+    t = (2*t)/(color_left-color_right)
+    t *= 0.5
+    return t
 
 
 def velocity_fn(x, base_velocity, steering_offset):
     """Calculates left and right velocity"""
     velocity_left = (min(base_velocity, base_velocity+2*base_velocity*x) +
-                     x*base_velocity*min(steering_offset, 0) +
-                     0.4*base_velocity*min(0, x))
+                     x*base_velocity*min(steering_offset, 0))
     velocity_right = (min(base_velocity, base_velocity-2*base_velocity*x) +
-                      x*base_velocity*max(steering_offset, 0) -
-                      0.4*base_velocity*max(0, x))
+                      x*base_velocity*max(steering_offset, 0))
     return (velocity_left, velocity_right)
 
 
@@ -78,7 +78,7 @@ def park(color_line, color_base):
     start_time = time.time()
     while True:
         drive_robot(velocity_fn(norm(color_line, color_base, left_light.reflection()), 200, -1))
-        if time.time() - start_time > 4.4:
+        if time.time() - start_time > 6.6:
             break
     drive_robot((0, 0))
 
@@ -86,7 +86,7 @@ def park(color_line, color_base):
 def back(color_line, color_base):
     """Backs the robot straight"""
     drive_over_line(color_line, color_base, right_light, (-150, -150))
-    drive_robot((200, 0))
+    drive_robot((150, 0))
     wait(1700)
 
 
@@ -102,28 +102,43 @@ def parking_mode(steering_offset_inv, color_line, color_base):
 
     if parking_empty:
         park(color_line, color_base)
-        wait(1000)
+        wait(3000)
         back(color_line, color_base)
     else:
-        drive_robot((0, 0))
-        drive_robot(velocity_fn(-1, 150, -1))
-        wait(230)
+        drive_robot((0,0))
 
+def calibrate():
+    """Calibrates the color sensor"""
+    ev3.speaker.beep()
+    color_left = left_light.reflection()
+    color_right = right_light.reflection()
+    ev3.speaker.beep()
+    wait(2000)
+    return color_left, color_right
 
 def main():
     """Main Function"""
-    color_left, color_right = 0, 100
-    base_velocity = 250
-    steering_offset = 1
-    drive_to_line(color_left, color_right, right_light, (180, 180))
+    color_left, color_right = calibrate()
+    #print(color_left,color_right)
+    #return
 
+    base_velocity = 180
+    steering_offset = 0
+    drive_to_line(color_left, color_right, right_light, (180, 180))
+    timer = time.time()
+    
     while True:
-        vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), base_velocity, steering_offset)
+        distance = obstacle_sensor.distance()
+        velocity = base_velocity*min(1,((distance-100)/200))
+        
+        vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), velocity, steering_offset)
         drive_robot(vel)
-        if left_light.reflection() < 30:
+        
+        if abs(left_light.reflection()-color_left) < abs(left_light.reflection()-color_right) and time.time()-timer > 3:
             parking_mode(-steering_offset, color_left, color_right)
             drive_to_line(color_left, color_right, right_light, (200, 200))
-
+            timer = time.time()
 
 if __name__ == '__main__':
     main()
+    
