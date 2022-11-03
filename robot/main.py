@@ -69,7 +69,6 @@ def drive_over_line(color_line, color_base, light, velocity):
 
 def park():
     """Parks the robot"""
-    start_time = time.time()
     drive_robot((70,150))
     wait(5000)
     drive_robot((150,150))
@@ -137,7 +136,7 @@ def main():
         vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), velocity, steering_offset)
         drive_robot(vel)
         
-        if light_on_line(color_left, color_right, left_light) and time.time()-timer > 1.7:
+        if light_on_line(color_left, left_light) and time.time()-timer > 1.7:
             parking_mode(-steering_offset, color_left, color_right)
             timer = time.time()
 
