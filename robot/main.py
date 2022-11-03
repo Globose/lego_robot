@@ -115,7 +115,9 @@ def calibrate():
 
 
 def light_on_line(color_line, color_base, light):
-    return abs(light.reflection()-color_line) < abs(light.reflection()-color_base)
+    """Returns true if sensor is on the line"""
+    ref = light.reflection()
+    return abs(ref-color_line) < abs(ref-color_base)
 
 
 def main():
