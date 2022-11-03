@@ -2,7 +2,7 @@
 import time
 from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import Motor, ColorSensor, UltrasonicSensor
-from pybricks.parameters import Port 
+from pybricks.parameters import Port
 from pybricks.tools import wait
 
 # Robot definition
@@ -41,7 +41,7 @@ def velocity_fn(x, base_velocity, steering_offset):
 
 
 def drive_robot(velocity):
-    """Drives robot forward"""
+    """Drives robot with left and right velocity"""
     left_motor.run(speed=velocity[0])
     right_motor.run(speed=velocity[1])
 
@@ -69,17 +69,11 @@ def drive_over_line(color_line, color_base, light, velocity):
 
 def park():
     """Parks the robot"""
-    start_time = time.time()
-    drive_robot((70,150))
+    drive_robot((70, 150))
     wait(5000)
-    drive_robot((150,150))
+    drive_robot((150, 150))
     wait(900)
     drive_robot((0, 0))
-
-
-def back(color_line, color_base):
-    """Backs the robot straight"""
-    drive_over_line(color_line, color_base, right_light, (-120, -170))
 
 
 def parking_mode(steering_offset_inv, color_line, color_base):
@@ -89,16 +83,16 @@ def parking_mode(steering_offset_inv, color_line, color_base):
     for i in range(13):
         wait(100)
         distances.append(obstacle_sensor.distance())
+
     drive_robot(velocity_fn(1, 150, -1))
     wait(1300)
     distance = min(distances)
-    
     parking_empty = distance > 210
-    
+
     if parking_empty:
         park()
         wait(5000)
-        back(color_line, color_base)
+        drive_over_line(color_line, color_base, right_light, (-120, -170))
     else:
         drive_robot((0, 150))
         wait(200)
@@ -133,10 +127,10 @@ def main():
     while True:
         distance = obstacle_sensor.distance()
         velocity = base_velocity*min(1, ((distance-100)/200))
-        
+
         vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), velocity, steering_offset)
         drive_robot(vel)
-        
+
         if light_on_line(color_left, color_right, left_light) and time.time()-timer > 1.7:
             parking_mode(-steering_offset, color_left, color_right)
             timer = time.time()
