@@ -69,8 +69,7 @@ def drive_over_line(color_line, color_base, light, velocity):
 
 def park():
     """Parks the robot"""
-    start_time = time.time()
-    drive_robot((70,150))
+    drive_robot((70, 150))
     wait(5000)
     drive_robot((150, 150))
     wait(900)
