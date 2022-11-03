@@ -9,13 +9,13 @@ from pybricks.tools import wait
 ev3 = EV3Brick()
 
 # Motor definitions
-left_motor = Motor(Port.A)
-right_motor = Motor(Port.B)
+left_motor = Motor(Port.B)
+right_motor = Motor(Port.C)
 
 # Sensor definitions
-left_light = ColorSensor(Port.S1)  # S3
-obstacle_sensor = UltrasonicSensor(Port.S2)  # S4
-right_light = ColorSensor(Port.S3)  # S2
+left_light = ColorSensor(Port.S3)  # S3
+obstacle_sensor = UltrasonicSensor(Port.S4)  # S4
+right_light = ColorSensor(Port.S2)  # S2
 
 # Here is where your code starts
 
@@ -27,7 +27,7 @@ def norm(color_left, color_right, color_current):
     t = (color_current-min(color_left, color_right) -
          .5*abs(color_left-color_right))
     t = (2*t)/(color_left-color_right)
-    t = (t**3+t)/2
+    t = 0.5*(t**3+t)/2
     return t
 
 
@@ -67,41 +67,41 @@ def drive_over_line(color_line, color_base, light, velocity):
             return
 
 
-def park(color_line, color_base):
+def park():
     """Parks the robot"""
-    drive_over_line(color_line, color_base, left_light, (150, 150))
     start_time = time.time()
-    while True:
-        drive_robot(velocity_fn(norm(color_line, color_base, left_light.reflection()), 200, -1))
-        if time.time() - start_time > 6.6:
-            break
+    drive_robot((70,150))
+    wait(5000)
+    drive_robot((150,150))
+    wait(900)
     drive_robot((0, 0))
 
 
 def back(color_line, color_base):
     """Backs the robot straight"""
-    drive_over_line(color_line, color_base, right_light, (-150, -150))
-    drive_robot((150, 0))
-    wait(1700)
+    drive_over_line(color_line, color_base, right_light, (-120, -170))
 
 
 def parking_mode(steering_offset_inv, color_line, color_base):
     """Attempts to park the robot"""
     drive_robot(velocity_fn(-1, 150, -1))
-    wait(1700)
+    distances = []
+    for i in range(13):
+        wait(100)
+        distances.append(obstacle_sensor.distance())
     drive_robot(velocity_fn(1, 150, -1))
-    wait(1700)
-
-    # Check radar
-    parking_empty = False
-
+    wait(1300)
+    distance = min(distances)
+    
+    parking_empty = distance > 210
+    
     if parking_empty:
-        park(color_line, color_base)
-        wait(3000)
+        park()
+        wait(5000)
         back(color_line, color_base)
     else:
         drive_robot((0, 150))
-        wait(150)
+        wait(200)
 
 
 def calibrate():
@@ -114,15 +114,15 @@ def calibrate():
     return color_left, color_right
 
 
-def light_on_line(color_line, color_base, light):
+def light_on_line(color_line, light):
     """Returns true if sensor is on the line"""
     ref = light.reflection()
-    return abs(ref-color_line) < abs(ref-color_base)
+    return abs(ref-color_line) < 1
 
 
 def main():
     """Main Function"""
-    color_left, color_right = 0, 100  # calibrate()
+    color_left, color_right = calibrate()
 
     base_velocity = 200
     steering_offset = 0
@@ -131,15 +131,14 @@ def main():
     timer = time.time()
 
     while True:
-        distance = obstacle_sensor.distance()*10
+        distance = obstacle_sensor.distance()
         velocity = base_velocity*min(1, ((distance-100)/200))
-
+        
         vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), velocity, steering_offset)
         drive_robot(vel)
-
-        if light_on_line(color_left, color_right, left_light) and time.time()-timer > 3:
+        
+        if light_on_line(color_left, color_right, left_light) and time.time()-timer > 1.7:
             parking_mode(-steering_offset, color_left, color_right)
-            drive_to_line(color_left, color_right, right_light, (200, 200))
             timer = time.time()
 
 
