@@ -27,7 +27,7 @@ def norm(color_left, color_right, color_current):
     t = (color_current-min(color_left, color_right) -
          .5*abs(color_left-color_right))
     t = (2*t)/(color_left-color_right)
-    t = 0.5*(t**3+t)/2
+    t = 0.6*(t**3+t)/2
     return t
 
 
@@ -72,11 +72,11 @@ def park():
     drive_robot((70, 150))
     wait(5000)
     drive_robot((150, 150))
-    wait(900)
+    wait(100)
     drive_robot((0, 0))
 
 
-def parking_mode(steering_offset_inv, color_line, color_base):
+def parking_mode(color_line, color_base):
     """Attempts to park the robot"""
     drive_robot(velocity_fn(-1, 150, -1))
     distances = []
@@ -111,17 +111,17 @@ def calibrate():
 def light_on_line(color_line, light):
     """Returns true if sensor is on the line"""
     ref = light.reflection()
-    return abs(ref-color_line) < 1
+    return abs(ref-color_line) < 2
 
 
 def main():
     """Main Function"""
     color_left, color_right = calibrate()
 
-    base_velocity = 200
-    steering_offset = 0
+    base_velocity = 400
+    steering_offset = 1
 
-    drive_to_line(color_left, color_right, right_light, (180, 180))
+    drive_over_line(color_left, color_right, right_light, (180, 180))
     timer = time.time()
 
     while True:
@@ -131,8 +131,8 @@ def main():
         vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), velocity, steering_offset)
         drive_robot(vel)
         
-        if light_on_line(color_left, color_right, left_light) and time.time()-timer > 1.7:
-            parking_mode(-steering_offset, color_left, color_right)
+        if light_on_line(color_left, left_light) and time.time()-timer > 1.7:
+            parking_mode(color_left, color_right)
             timer = time.time()
 
 
