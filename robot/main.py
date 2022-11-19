@@ -19,9 +19,8 @@ left_light = ColorSensor(Port.S3)  # S3
 obstacle_sensor = UltrasonicSensor(Port.S4)  # S4
 right_light = ColorSensor(Port.S2)  # S2
 
-# Here is where your code starts
 
-
+### Driving
 def norm(color_left, color_right, color_current):
     """Returns a number between -1 and 1
         -1 => Turn left, 1 => turn right, 0 => drive straight
@@ -48,78 +47,45 @@ def drive_robot(velocity):
     right_motor.run(speed=velocity[1])
 
 
-def drive_to_line(color_line, color_base, light, velocity):
+def follow_line(base_velocity, color_left, color_right, driving_sensor, steering_offset):
+    """Robot follows the line"""
+    distance = obstacle_sensor.distance()
+    velocity = base_velocity*min(1, max(0,((distance-100)/200)))
+    drive_robot(velocity_fn(norm(color_left, color_right, driving_sensor.reflection()), velocity, steering_offset))
+
+
+def drive_to_line(color_line, color_base, sensor, velocity):
     """Drives robot and stops before the line"""
     drive_robot(velocity)
     while True:
-        light_refl = light.reflection()
+        light_refl = sensor.reflection()
         if abs(color_line-light_refl) < abs(color_base-light_refl):
             drive_robot((0, 0))
             return
 
 
-def drive_over_line(color_line, color_base, light, velocity):
+def drive_over_line(color_line, color_base, sensor, velocity):
     """Drives robot and stops after the line"""
-    drive_to_line(color_line, color_base, light, velocity)
+    drive_to_line(color_line, color_base, sensor, velocity)
     drive_robot(velocity)
     while True:
-        light_refl = light.reflection()
+        light_refl = sensor.reflection()
         if abs(color_line-light_refl) > abs(color_base-light_refl):
             drive_robot((0, 0))
             return
 
 
-def park():
-    """Parks the robot"""
-    drive_robot((70, 150))
-    wait(5000)
-    drive_robot((150, 150))
-    wait(100)
-    drive_robot((0, 0))
-
-
-def parking_mode(color_line, color_base, mbox):
-    """Attempts to park the robot"""
-    drive_robot(velocity_fn(-1, 150, -1))
-    distances = []
-    for i in range(13):
-        wait(100)
-        distances.append(obstacle_sensor.distance())
-
-    drive_robot(velocity_fn(1, 150, -1))
-    wait(1300)
-    distance = min(distances)
-    parking_empty = distance > 210
-
-    if parking_empty:
-        park()
-        ev3.light.on(Color.RED)
-        #wait(5000)
-        client_parked = False
-        while not client_parked:
-            msg_from_client = mbox.read()
-            last_msg = msg_from_client
-            if last_msg == 'parked':
-                client_parked = True
-            wait(1000)
-        
-        mbox.send('both_parked')
-        ev3.light.on(Color.YELLOW)
-        wait(random.randint(1, 7)*1000)
-        mbox.send('unpark')
-        wait(7000)
-        drive_over_line(color_line, color_base, right_light, (-120, -170))
-        ev3.light.on(Color.GREEN)
-        return True
-    else:
-        drive_robot((0, 150))
-        wait(200)
-        return False
+def rotate_on_line(color_line, sensor, velocity = (190,-190)):
+    """Rotates robot until a sensor is on the line"""
+    drive_robot(velocity)
+    while True:
+        if sensor_on_line(color_line, sensor):
+            break
+    drive_robot((0,0))
 
 
 def calibrate():
     """Calibrates the color sensor"""
-    ev3.speaker.beep()
     color_left = left_light.reflection()
     color_right = right_light.reflection()
     ev3.speaker.beep()
@@ -127,13 +93,104 @@ def calibrate():
     return color_left, color_right
 
 
-def light_on_line(color_line, light):
+def sensor_on_line(color_line, sensor, limit = 2):
     """Returns true if sensor is on the line"""
-    ref = light.reflection()
-    return abs(ref-color_line) < 2
+    return abs(sensor.reflection()-color_line) < limit
 
 
+def follow_line_straight(color_left, color_right, color_base, sensor, steering_offset):
+    """Follows a line straight to the end of it"""
+    while abs(norm(color_left, color_right, sensor.reflection())) > 0.01:
+        follow_line(180, color_left, color_right, sensor, steering_offset)
+    
+    drive_robot((180,180))
+    while True:
+        if sensor_on_line(color_base, sensor):
+            break
+    drive_robot((0,0))
+
+
+def rotate180():
+    """Rotates robot 180 deg"""
+    drive_robot((-200,200))
+    wait(2500)
+    drive_robot((-200,-200))
+    wait(400)
+    drive_robot((0,0))
+
+
+### Parking
+def park_line(color_line, color_base, parking_sensor):
+    """Parks robot"""
+    color_left, color_right, steering_offset = color_line, color_base, -1
+    if parking_sensor == right_light:
+        color_left, color_right, steering_offset = color_base, color_line, 1
+        
+    drive_over_line(color_line, color_base, parking_sensor, (180,180))
+    follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset)
+
+
+def wait_for_client_park(mbox):
+    """Waits for the client to park"""
+    client_parked = False
+    while not client_parked:
+        if mbox.read() == 'parked':
+            client_parked = True
+        wait(1000)
+            
+
+def empty_parking_spot(color_line, parking_sensor):
+    """Returns true if the parking spot is empty"""
+    velocity = (180,-180)
+    if parking_sensor == left_light:
+        velocity = (-180,180)
+    
+    drive_robot(velocity)    
+    distances = []
+    for i in range(13):
+        wait(100)
+        distances.append(obstacle_sensor.distance())
+    
+    rotate_on_line(color_line, parking_sensor, (velocity[1],velocity[0]))    
+    return min(distances) > 210
+
+
+def unpark(color_line, color_base, driving_sensor, mbox):
+    """Unparks the robots"""
+    mbox.send('unpark')
+    
+    color_left, color_right, steering_offset = color_line, color_base, -1
+    if driving_sensor == right_light:
+        color_left, color_right, steering_offset = color_base, color_line, 1
+    
+    rotate_on_line(color_line, driving_sensor, (180*steering_offset,-180*steering_offset))
+    follow_line_straight(color_left, color_right, color_base, driving_sensor, steering_offset)
+    drive_over_line(color_line, color_base, driving_sensor, (180, 180))
+    ev3.light.on(Color.GREEN)
+    
+
+def parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox):
+    """Attempts to park the robot. Returns False if parking spot was occupied"""
+    parking_empty = empty_parking_spot(color_line, parking_sensor)
+    
+    if parking_empty:
+        park_line(color_line, color_base, parking_sensor)
+        ev3.light.on(Color.RED)
+        
+        wait_for_client_park(mbox)
+        mbox.send('both_parked')
+        ev3.light.on(Color.YELLOW)
+        
+        wait(random.randint(1, 7)*1000)
+        unpark(color_line, color_base, driving_sensor, mbox)
+        return True
+
+    return False
+
+
+### Bluetooth
 def connect():
+    """Connects to another robot via Bluetooth"""
     server = BluetoothMailboxServer()
     mbox = TextMailbox('greeting', server)
     print("Waiting for connection..")
@@ -142,51 +199,47 @@ def connect():
     return mbox
 
 
+def driving_mode(color_line, color_base, mode):
+    """Returns constants for choosen driving mode"""
+    if mode == 1: # Left sensor on left side of the line
+        return left_light, right_light, color_base, color_line, -1
+    if mode == -1: # Right sensor on right side of the line
+        return right_light, left_light, color_line, color_base, 1
+
+
 def main():
     """Main Function"""
-    ev3.light.on(Color.GREEN)
-    color_left, color_right = calibrate()
-    mbox = connect()
-    
+    # Setup
     parking_enabled = False
-    
-    last_msg = mbox.read()
-    
+    drive_reversed = False
     base_velocity = 170
-    steering_offset = 1
+    color_line, color_base = calibrate() #Left on line, right on base
+    mode = 1
+    
+    driving_sensor, parking_sensor, color_left, color_right, steering_offset = driving_mode(color_line, color_base, mode)
+    mbox = connect()
+    last_msg = mbox.read()
 
-    drive_to_line(color_left, color_right, right_light, (180,180))
-    #drive_over_line(color_left, color_right, right_light, (180, 180))
+    drive_to_line(color_line, color_base, driving_sensor, (180,180))
+    #drive_over_line(color_line, color_base, driving_sensor, (180, 180))
     timer = time.time()
     
     while True:
-        distance = obstacle_sensor.distance()
-        velocity = base_velocity*min(1, ((distance-100)/200))
-
-        vel = velocity_fn(norm(color_left, color_right, right_light.reflection()), velocity, steering_offset)
-        drive_robot(vel)
+        follow_line(base_velocity, color_left, color_right, driving_sensor, steering_offset)
         
-        if parking_enabled and light_on_line(color_left, left_light) and time.time()-timer > 1.6:
-            parked = parking_mode(color_left, color_right, mbox)
+        if sensor_on_line(color_line, parking_sensor) and parking_enabled and time.time()-timer > 1.6:
+            parking_enabled = not parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox)
             timer = time.time()
-            parking_enabled = not parked
+        
+        if drive_reversed and time.time()-timer > 4:
+            rotate180()
+            mode *= -1
+            driving_sensor, parking_sensor, color_left, color_right, steering_offset = driving_mode(color_line, color_base, mode)
+            drive_reversed = False
         
         if time.time() - timer > 15 and not parking_enabled:
-            print("sending parking")
             mbox.send('park')
-            mbox.send('park')
-            mbox.send('park')
-            mbox.send('park')
-            mbox.send('0')
             parking_enabled = True
-        
-        msg_from_client = mbox.read()
-        if msg_from_client != last_msg:
-            print(msg_from_client)
-            last_msg = msg_from_client
-            if last_msg == 'parked':
-                client_parked = True
-                
 
 if __name__ == '__main__':
     main()
