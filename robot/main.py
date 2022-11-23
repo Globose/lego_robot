@@ -24,6 +24,7 @@ MSG_PARK = 'park'
 MSG_BOTH_PARKED = 'both_parked'
 MSG_UNPARK = 'unpark'
 MSG_ROTATE = 'rotate'
+MSG_UNROTATE = 'unrotate'
 REC_PARKED = 'parked'
 REC_UNPARKED = 'unparked'
 
@@ -192,8 +193,8 @@ def empty_parking_spot(color_line, parking_sensor):
 
     drive_robot(velocity)
     distances = []
-    for i in range(13):
-        wait(100)
+    for i in range(12):
+        wait(50)
         distances.append(obstacle_sensor.distance())
 
     rotate_on_line(color_line, parking_sensor, (velocity[1], velocity[0]))
@@ -231,13 +232,15 @@ def connect():
 
 
 # Reverse
-def reverse(mode):
+def reverse(mode, mbox):
     """Sets new values when reversing"""
     reversed_limit = random.randint(30, 60)
     reverse_mode = False 
     if mode == DRIVING_MODE:
         ev3.light.on(COLOR_DRIVING)
+        mbox.send(MSG_UNROTATE)
     else:
+        mbox.send(MSG_ROTATE)
         ev3.light.on(COLOR_REVERSED)
         reversed_limit = random.randint(10, 20)
         reverse_mode = True
@@ -274,10 +277,9 @@ def main():
                 ev3.light.on(COLOR_DRIVING)
 
         if time.time()-reversed_timer > reversed_limit and time.time()-timer > 4:
-            mbox.send(MSG_ROTATE)
             mode *= -1
             driving_sensor, parking_sensor, color_left, color_right, steering_offset = driving_mode(color_line, color_base, mode)
-            reversed_limit, reverse_mode = reverse(mode)
+            reversed_limit, reverse_mode = reverse(mode, mbox)
             rotate180()
             reversed_timer = time.time()
             timer = time.time()
