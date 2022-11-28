@@ -30,7 +30,7 @@ REC_UNPARKED = 'unparked'
 
 # Color definitions
 COLOR_DRIVING = Color.GREEN
-COLOR_LOOKING_FOR_PARKING = Color.YELLOW
+COLOR_PARKING_ENABLED = Color.YELLOW
 COLOR_PARKING = Color.ORANGE
 COLOR_UNPARKING = Color.ORANGE
 COLOR_PARKED = Color.RED
@@ -53,22 +53,17 @@ def driving_mode(color_line, color_base, mode):
 
 
 def norm(color_left, color_right, color_current):
-    """Returns a number between -1 and 1
-        -1 => Turn left, 1 => turn right, 0 => drive straight
-    """
-    t = (color_current-min(color_left, color_right) -
-         .5*abs(color_left-color_right))
+    """Returns a number between -1 and 1 indicating turn rate"""
+    t = (color_current-min(color_left, color_right)-.5*abs(color_left-color_right))
     t = (2*t)/(color_left-color_right)
     t = 0.88*(t**3+t)/2
     return t
 
 
-def velocity_fn(x, base_velocity, steering_offset):
+def velocity_fn(x, velocity, steering_offset):
     """Calculates left and right velocity"""
-    velocity_left = (min(base_velocity, base_velocity+2*base_velocity*x) +
-                     x*base_velocity*min(steering_offset, 0))
-    velocity_right = (min(base_velocity, base_velocity-2*base_velocity*x) +
-                      x*base_velocity*max(steering_offset, 0))
+    velocity_left = (min(velocity, velocity+2*velocity*x)+x*velocity*min(steering_offset, 0))
+    velocity_right = (min(velocity, velocity-2*velocity*x)+x*velocity*max(steering_offset, 0))
     return (velocity_left, velocity_right)
 
 
@@ -87,15 +82,15 @@ def rotate180():
     drive_robot((0, 0))
 
 
-# Line Driving
-def follow_line(base_velocity, color_left, color_right, driving_sensor, steering_offset):
-    """Robot follows the line"""
+# Line Following
+def follow_line(color_left, color_right, driving_sensor, steering_offset):
+    """Robot follows the line with cc"""
     distance = obstacle_sensor.distance()
-    velocity = base_velocity*min(1, max(0, ((distance-100)/200)))
+    velocity = BASE_VELOCITY*min(1, max(0, ((distance-100)/200)))
     drive_robot(velocity_fn(norm(color_left, color_right, driving_sensor.reflection()), velocity, steering_offset))
 
 
-def drive_to_line(color_line, color_base, sensor, velocity):
+def stop_before_line(color_line, color_base, sensor, velocity):
     """Drives robot and stops before the line"""
     drive_robot(velocity)
     while True:
@@ -105,9 +100,9 @@ def drive_to_line(color_line, color_base, sensor, velocity):
             return
 
 
-def drive_over_line(color_line, color_base, sensor, velocity):
+def stop_past_line(color_line, color_base, sensor, velocity):
     """Drives robot and stops after the line"""
-    drive_to_line(color_line, color_base, sensor, velocity)
+    stop_on_line(color_line, sensor, velocity)
     drive_robot(velocity)
     while True:
         light_refl = sensor.reflection()
@@ -116,8 +111,8 @@ def drive_over_line(color_line, color_base, sensor, velocity):
             return
 
 
-def rotate_on_line(color_line, sensor, velocity=(190, -190)):
-    """Rotates robot until a sensor is on the line"""
+def stop_on_line(color_line, sensor, velocity):
+    """Drives robot and stops on the line"""
     drive_robot(velocity)
     while True:
         if sensor_on_line(color_line, sensor):
@@ -128,7 +123,7 @@ def rotate_on_line(color_line, sensor, velocity=(190, -190)):
 def follow_line_straight(color_left, color_right, color_base, sensor, steering_offset):
     """Follows a line straight to the end of it"""
     while abs(norm(color_left, color_right, sensor.reflection())) > 0.01:
-        follow_line(180, color_left, color_right, sensor, steering_offset)
+        follow_line(color_left, color_right, sensor, steering_offset)
 
     drive_robot((180, 180))
     while True:
@@ -169,19 +164,19 @@ def unpark(color_line, color_base, driving_sensor, mbox):
     if driving_sensor == right_light:
         color_left, color_right, steering_offset = color_base, color_line, 1
 
-    rotate_on_line(color_line, driving_sensor, (180*steering_offset, -180*steering_offset))
+    stop_before_line(color_line, color_base, driving_sensor, (180*steering_offset, -180*steering_offset))
     follow_line_straight(color_left, color_right, color_base, driving_sensor, steering_offset)
-    drive_over_line(color_line, color_base, driving_sensor, (180, 180))
+    stop_past_line(color_line, color_base, driving_sensor, (180, 180))
 
 
-def park_line(color_line, color_base, parking_sensor):
+def park(color_line, color_base, parking_sensor):
     """Parks robot"""
     ev3.light.on(COLOR_PARKING)
     color_left, color_right, steering_offset = color_line, color_base, -1
     if parking_sensor == right_light:
         color_left, color_right, steering_offset = color_base, color_line, 1
 
-    drive_over_line(color_line, color_base, parking_sensor, (180, 180))
+    stop_on_line(color_base, parking_sensor, (180,180))
     follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset)
 
 
@@ -197,7 +192,7 @@ def empty_parking_spot(color_line, parking_sensor):
         wait(50)
         distances.append(obstacle_sensor.distance())
 
-    rotate_on_line(color_line, parking_sensor, (velocity[1], velocity[0]))
+    stop_on_line(color_line, parking_sensor, (velocity[1], velocity[0]))
     return min(distances) > 210
 
 
@@ -206,7 +201,7 @@ def parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox):
     parking_empty = empty_parking_spot(color_line, parking_sensor)
 
     if parking_empty:
-        park_line(color_line, color_base, parking_sensor)
+        park(color_line, color_base, parking_sensor)
         ev3.light.on(COLOR_PARKED)
 
         wait_for_client(mbox, REC_PARKED)
@@ -251,7 +246,6 @@ def main():
     """Main Function"""
     parking_enabled = False
     reverse_mode = False
-    base_velocity = BASE_VELOCITY
     color_line, color_base = calibrate()  # Left on line, right on base
     mode = DRIVING_MODE
 
@@ -259,14 +253,14 @@ def main():
     mbox = connect()
     ev3.light.on(COLOR_DRIVING)
 
-    drive_to_line(color_line, color_base, driving_sensor, (180, 180))
+    stop_on_line(color_line, driving_sensor, (180, 180))
 
     timer = time.time()
     reversed_timer = time.time()
     reversed_limit = random.randint(20, 60)
 
     while True:
-        follow_line(base_velocity, color_left, color_right, driving_sensor, steering_offset)
+        follow_line(color_left, color_right, driving_sensor, steering_offset)
 
         if sensor_on_line(color_line, parking_sensor) and parking_enabled and time.time()-timer > 1.6 and not reverse_mode:
             parking_enabled = not parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox)
@@ -288,8 +282,34 @@ def main():
         if time.time() - timer > 15 and not parking_enabled and not reverse_mode:
             mbox.send(MSG_PARK)
             parking_enabled = True
-            ev3.light.on(COLOR_LOOKING_FOR_PARKING)
+            ev3.light.on(COLOR_PARKING_ENABLED)
 
+
+def test():
+    ev3.light.on(Color.YELLOW)
+    wait(1000)
+    ev3.light.on(Color.BLACK)
+    wait(1000)
+    ev3.light.on(Color.RED)
+    wait(1000)
+    ev3.light.on(Color.BLUE)
+    wait(1000)
+    ev3.light.on(Color.WHITE)
+    wait(1000)
+    ev3.light.on(Color.GREEN)
+    wait(1000)
+    ev3.light.on(Color.ORANGE)
+    wait(1000)
+    ev3.light.on(Color.BROWN)
+    wait(1000)
+    ev3.light.on(Color.CYAN)
+    wait(1000)
+    ev3.light.on(Color.GRAY)
+    wait(1000)
+    ev3.light.on(Color.MAGENTA)
+    wait(1000)
+    ev3.light.on(Color.VIOLET)
+    wait(1000)
 
 if __name__ == '__main__':
     main()
