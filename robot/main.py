@@ -31,12 +31,12 @@ REC_UNPARKED = 'unparked'
 # Color definitions
 COLOR_DRIVING = Color.GREEN
 COLOR_PARKING_ENABLED = Color.YELLOW
-COLOR_PARKING = Color.ORANGE
-COLOR_UNPARKING = Color.ORANGE
+COLOR_PARKING = Color.YELLOW
+COLOR_UNPARKING = Color.GREEN
 COLOR_PARKED = Color.RED
 COLOR_WAITING = Color.RED
-COLOR_BOTH_PARKED = Color.BLUE
-COLOR_REVERSED = Color.WHITE
+COLOR_BOTH_PARKED = Color.RED
+COLOR_REVERSED = Color.GREEN
 
 # Driving definitions
 DRIVING_MODE = -1
@@ -284,32 +284,6 @@ def main():
             parking_enabled = True
             ev3.light.on(COLOR_PARKING_ENABLED)
 
-
-def test():
-    ev3.light.on(Color.YELLOW)
-    wait(1000)
-    ev3.light.on(Color.BLACK)
-    wait(1000)
-    ev3.light.on(Color.RED)
-    wait(1000)
-    ev3.light.on(Color.BLUE)
-    wait(1000)
-    ev3.light.on(Color.WHITE)
-    wait(1000)
-    ev3.light.on(Color.GREEN)
-    wait(1000)
-    ev3.light.on(Color.ORANGE)
-    wait(1000)
-    ev3.light.on(Color.BROWN)
-    wait(1000)
-    ev3.light.on(Color.CYAN)
-    wait(1000)
-    ev3.light.on(Color.GRAY)
-    wait(1000)
-    ev3.light.on(Color.MAGENTA)
-    wait(1000)
-    ev3.light.on(Color.VIOLET)
-    wait(1000)
 
 if __name__ == '__main__':
     main()
