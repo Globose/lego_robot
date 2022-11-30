@@ -33,14 +33,14 @@ COLOR_DRIVING = Color.GREEN
 COLOR_PARKING_ENABLED = Color.YELLOW
 COLOR_PARKING = Color.YELLOW
 COLOR_UNPARKING = Color.GREEN
-COLOR_PARKED = Color.RED
+COLOR_PARKED = Color.YELLOW
 COLOR_WAITING = Color.RED
 COLOR_BOTH_PARKED = Color.RED
 COLOR_REVERSED = Color.GREEN
 
 # Driving definitions
 DRIVING_MODE = -1
-BASE_VELOCITY = 180
+BASE_VELOCITY = 200
 
 
 # Driving
@@ -75,19 +75,35 @@ def drive_robot(velocity):
 
 def rotate180():
     """Rotates robot 180 deg"""
-    drive_robot((-200, 200))
-    wait(2500)
-    drive_robot((-200, -200))
-    wait(400)
-    drive_robot((0, 0))
+    drive_robot((200,200))
+    wait(1000)
+    drive_robot((-200,200))
+    wait(2520)
+    drive_robot((0,0))
 
 
 # Line Following
-def follow_line(color_left, color_right, driving_sensor, steering_offset):
+def follow_line(color_left, color_right, driving_sensor, steering_offset, cc = True):
     """Robot follows the line with cc"""
-    distance = obstacle_sensor.distance()
-    velocity = BASE_VELOCITY*min(1, max(0, ((distance-100)/200)))
+    velocity = BASE_VELOCITY
+    if cc:
+        distance = obstacle_sensor.distance()
+        velocity = BASE_VELOCITY*min(1, max(0,((distance-10)/20)))
     drive_robot(velocity_fn(norm(color_left, color_right, driving_sensor.reflection()), velocity, steering_offset))
+
+
+def follow_line_straight(color_left, color_right, color_base, sensor, steering_offset, limit=2):
+    """Follows a line straight to the end of it"""
+    parking_timer = time.time()
+    
+    while time.time() - parking_timer < limit:
+        follow_line(color_left, color_right, sensor, steering_offset, False)
+
+    drive_robot((BASE_VELOCITY, BASE_VELOCITY))
+    while True:
+        if sensor_on_line(color_base, sensor):
+            break
+    drive_robot((0, 0))
 
 
 def stop_before_line(color_line, color_base, sensor, velocity):
@@ -116,18 +132,6 @@ def stop_on_line(color_line, sensor, velocity):
     drive_robot(velocity)
     while True:
         if sensor_on_line(color_line, sensor):
-            break
-    drive_robot((0, 0))
-
-
-def follow_line_straight(color_left, color_right, color_base, sensor, steering_offset):
-    """Follows a line straight to the end of it"""
-    while abs(norm(color_left, color_right, sensor.reflection())) > 0.01:
-        follow_line(color_left, color_right, sensor, steering_offset)
-
-    drive_robot((180, 180))
-    while True:
-        if sensor_on_line(color_base, sensor):
             break
     drive_robot((0, 0))
 
@@ -164,9 +168,9 @@ def unpark(color_line, color_base, driving_sensor, mbox):
     if driving_sensor == right_light:
         color_left, color_right, steering_offset = color_base, color_line, 1
 
-    stop_before_line(color_line, color_base, driving_sensor, (180*steering_offset, -180*steering_offset))
-    follow_line_straight(color_left, color_right, color_base, driving_sensor, steering_offset)
-    stop_past_line(color_line, color_base, driving_sensor, (180, 180))
+    stop_before_line(color_line, color_base, driving_sensor, (BASE_VELOCITY*steering_offset, -BASE_VELOCITY*steering_offset))
+    follow_line_straight(color_left, color_right, color_base, driving_sensor, steering_offset, 1)
+    stop_past_line(color_line, color_base, driving_sensor, (BASE_VELOCITY, BASE_VELOCITY))
 
 
 def park(color_line, color_base, parking_sensor):
@@ -176,8 +180,21 @@ def park(color_line, color_base, parking_sensor):
     if parking_sensor == right_light:
         color_left, color_right, steering_offset = color_base, color_line, 1
 
-    stop_on_line(color_base, parking_sensor, (180,180))
-    follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset)
+    stop_on_line(color_base, parking_sensor, (BASE_VELOCITY,BASE_VELOCITY))
+    follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset, 2.5)
+
+
+def empty_parking_spot_old():
+    drive_robot(velocity_fn(-1, 150, -1))
+    distances = []
+    for i in range(13):
+        wait(100)
+        distances.append(obstacle_sensor.distance())
+
+    drive_robot(velocity_fn(1, 150, -1))
+    wait(1300)
+    distance = min(distances)
+    return distance > 210
 
 
 def empty_parking_spot(color_line, parking_sensor):
@@ -189,7 +206,7 @@ def empty_parking_spot(color_line, parking_sensor):
     drive_robot(velocity)
     distances = []
     for i in range(12):
-        wait(50)
+        wait(30)
         distances.append(obstacle_sensor.distance())
 
     stop_on_line(color_line, parking_sensor, (velocity[1], velocity[0]))
@@ -199,6 +216,7 @@ def empty_parking_spot(color_line, parking_sensor):
 def parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox):
     """Attempts to park and unpark the robot. Returns False if parking spot is occupied"""
     parking_empty = empty_parking_spot(color_line, parking_sensor)
+    #parking_empty = empty_parking_spot_old()
 
     if parking_empty:
         park(color_line, color_base, parking_sensor)
@@ -253,16 +271,17 @@ def main():
     mbox = connect()
     ev3.light.on(COLOR_DRIVING)
 
-    stop_on_line(color_line, driving_sensor, (180, 180))
+    stop_on_line(color_line, driving_sensor, (BASE_VELOCITY, BASE_VELOCITY))
 
     timer = time.time()
     reversed_timer = time.time()
     reversed_limit = random.randint(20, 60)
 
     while True:
-        follow_line(color_left, color_right, driving_sensor, steering_offset)
+        follow_line(color_left, color_right, driving_sensor, steering_offset, True)
 
-        if sensor_on_line(color_line, parking_sensor) and parking_enabled and time.time()-timer > 1.6 and not reverse_mode:
+        # Parking
+        if sensor_on_line(color_line, parking_sensor) and parking_enabled and time.time()-timer > 1.6:
             parking_enabled = not parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox)
             timer = time.time()
             if reverse_mode and not parking_enabled:
@@ -270,6 +289,7 @@ def main():
             elif not parking_enabled:
                 ev3.light.on(COLOR_DRIVING)
 
+        # Reverse
         if time.time()-reversed_timer > reversed_limit and time.time()-timer > 4:
             mode *= -1
             driving_sensor, parking_sensor, color_left, color_right, steering_offset = driving_mode(color_line, color_base, mode)
@@ -279,6 +299,7 @@ def main():
             timer = time.time()
             parking_enabled = False
 
+        # Enable parking
         if time.time() - timer > 15 and not parking_enabled and not reverse_mode:
             mbox.send(MSG_PARK)
             parking_enabled = True
