@@ -41,6 +41,8 @@ COLOR_REVERSED = Color.GREEN
 # Driving definitions
 DRIVING_MODE = -1
 BASE_VELOCITY = 200
+PARK_LIMIT = 4
+UNPARK_LIMIT = 3
 
 
 # Driving
@@ -98,6 +100,9 @@ def follow_line_straight(color_left, color_right, color_base, sensor, steering_o
     
     while time.time() - parking_timer < limit:
         follow_line(color_left, color_right, sensor, steering_offset, False)
+
+    drive_robot((0,0))
+    wait(1000)
 
     drive_robot((BASE_VELOCITY, BASE_VELOCITY))
     while True:
@@ -169,7 +174,7 @@ def unpark(color_line, color_base, driving_sensor, mbox):
         color_left, color_right, steering_offset = color_base, color_line, 1
 
     stop_before_line(color_line, color_base, driving_sensor, (BASE_VELOCITY*steering_offset, -BASE_VELOCITY*steering_offset))
-    follow_line_straight(color_left, color_right, color_base, driving_sensor, steering_offset, 1)
+    follow_line_straight(color_left, color_right, color_base, driving_sensor, steering_offset, UNPARK_LIMIT)
     stop_past_line(color_line, color_base, driving_sensor, (BASE_VELOCITY, BASE_VELOCITY))
 
 
@@ -181,7 +186,7 @@ def park(color_line, color_base, parking_sensor):
         color_left, color_right, steering_offset = color_base, color_line, 1
 
     stop_on_line(color_base, parking_sensor, (BASE_VELOCITY,BASE_VELOCITY))
-    follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset, 2.5)
+    follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset, PARK_LIMIT)
 
 
 def empty_parking_spot_old():
@@ -260,6 +265,34 @@ def reverse(mode, mbox):
     return reversed_limit, reverse_mode
 
 
+def test():
+    PAUSE = 100
+    ev3.light.on(Color.YELLOW)
+    wait(PAUSE)
+    ev3.light.on(Color.BLACK)
+    wait(PAUSE)
+    ev3.light.on(Color.RED)
+    wait(PAUSE)
+    ev3.light.on(Color.BLUE)
+    wait(PAUSE)
+    ev3.light.on(Color.WHITE)
+    wait(PAUSE)
+    ev3.light.on(Color.GREEN)
+    wait(PAUSE)
+    ev3.light.on(Color.ORANGE)
+    wait(PAUSE)
+    ev3.light.on(Color.BROWN)
+    wait(PAUSE)
+    ev3.light.on(Color.CYAN)
+    wait(PAUSE)
+    ev3.light.on(Color.GRAY)
+    wait(PAUSE)
+    ev3.light.on(Color.MAGENTA)
+    wait(PAUSE)
+    ev3.light.on(Color.VIOLET)
+    wait(PAUSE)
+
+
 def main():
     """Main Function"""
     parking_enabled = False
@@ -307,4 +340,6 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    #main()
+    #rotate180()
+    test()
