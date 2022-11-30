@@ -5,7 +5,6 @@ from pybricks.hubs import EV3Brick
 from pybricks.ev3devices import Motor, ColorSensor, UltrasonicSensor
 from pybricks.parameters import Port, Color
 from pybricks.tools import wait
-from pybricks.messaging import BluetoothMailboxServer, TextMailbox
 
 # Robot definition
 ev3 = EV3Brick()
@@ -157,16 +156,8 @@ def sensor_on_line(color_line, sensor, limit=2):
 
 
 # Parking
-def wait_for_client(mbox, msg):
-    """Waits for a matching client message"""
-    while not mbox.read() == msg:
-        wait(1000)
-
-
-def unpark(color_line, color_base, driving_sensor, mbox):
+def unpark(color_line, color_base, driving_sensor):
     """Unparks the robots"""
-    mbox.send(MSG_UNPARK)
-    wait_for_client(mbox, REC_UNPARKED)
     ev3.light.on(COLOR_UNPARKING)
 
     color_left, color_right, steering_offset = color_line, color_base, -1
@@ -189,19 +180,6 @@ def park(color_line, color_base, parking_sensor):
     follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset, PARK_LIMIT)
 
 
-def empty_parking_spot_old():
-    drive_robot(velocity_fn(-1, 150, -1))
-    distances = []
-    for i in range(13):
-        wait(100)
-        distances.append(obstacle_sensor.distance())
-
-    drive_robot(velocity_fn(1, 150, -1))
-    wait(1300)
-    distance = min(distances)
-    return distance > 210
-
-
 def empty_parking_spot(color_line, parking_sensor):
     """Returns true if the parking spot is empty"""
     velocity = (180, -180)
@@ -218,47 +196,28 @@ def empty_parking_spot(color_line, parking_sensor):
     return min(distances) > 210
 
 
-def parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox):
+def parking_mode(color_line, color_base, driving_sensor, parking_sensor):
     """Attempts to park and unpark the robot. Returns False if parking spot is occupied"""
     parking_empty = empty_parking_spot(color_line, parking_sensor)
-    #parking_empty = empty_parking_spot_old()
 
     if parking_empty:
         park(color_line, color_base, parking_sensor)
         ev3.light.on(COLOR_PARKED)
 
-        wait_for_client(mbox, REC_PARKED)
-        mbox.send(MSG_BOTH_PARKED)
-        ev3.light.on(COLOR_BOTH_PARKED)
-
         wait(random.randint(1, 7)*1000)
-        unpark(color_line, color_base, driving_sensor, mbox)
+        unpark(color_line, color_base, driving_sensor)
         return True
     return False
 
 
-# Bluetooth
-def connect():
-    """Connects to another robot via Bluetooth"""
-    ev3.light.on(COLOR_WAITING)
-    server = BluetoothMailboxServer()
-    mbox = TextMailbox('greeting', server)
-    print("Waiting for connection..")
-    server.wait_for_connection()
-    print("Connected..")
-    return mbox
-
-
 # Reverse
-def reverse(mode, mbox):
+def reverse(mode):
     """Sets new values when reversing"""
     reversed_limit = random.randint(40, 60)
     reverse_mode = False 
     if mode == DRIVING_MODE:
         ev3.light.on(COLOR_DRIVING)
-        mbox.send(MSG_UNROTATE)
     else:
-        mbox.send(MSG_ROTATE)
         ev3.light.on(COLOR_REVERSED)
         reversed_limit = random.randint(5, 14)
         reverse_mode = True
@@ -301,21 +260,20 @@ def main():
     mode = DRIVING_MODE
 
     driving_sensor, parking_sensor, color_left, color_right, steering_offset = driving_mode(color_line, color_base, mode)
-    mbox = connect()
     ev3.light.on(COLOR_DRIVING)
 
     stop_on_line(color_line, driving_sensor, (BASE_VELOCITY, BASE_VELOCITY))
 
     timer = time.time()
     reversed_timer = time.time()
-    reversed_limit = random.randint(20, 60)
+    reversed_limit = random.randint(40, 60)
 
     while True:
         follow_line(color_left, color_right, driving_sensor, steering_offset, True)
 
         # Parking
         if sensor_on_line(color_line, parking_sensor) and parking_enabled and time.time()-timer > 1.6:
-            parking_enabled = not parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox)
+            parking_enabled = not parking_mode(color_line, color_base, driving_sensor, parking_sensor)
             timer = time.time()
             if reverse_mode and not parking_enabled:
                 ev3.light.on(COLOR_REVERSED)
@@ -326,7 +284,7 @@ def main():
         if time.time()-reversed_timer > reversed_limit and time.time()-timer > 4:
             mode *= -1
             driving_sensor, parking_sensor, color_left, color_right, steering_offset = driving_mode(color_line, color_base, mode)
-            reversed_limit, reverse_mode = reverse(mode, mbox)
+            reversed_limit, reverse_mode = reverse(mode)
             rotate180()
             reversed_timer = time.time()
             timer = time.time()
@@ -334,12 +292,9 @@ def main():
 
         # Enable parking
         if time.time() - timer > 15 and not parking_enabled and not reverse_mode:
-            mbox.send(MSG_PARK)
             parking_enabled = True
             ev3.light.on(COLOR_PARKING_ENABLED)
 
 
 if __name__ == '__main__':
-    #main()
-    #rotate180()
-    test()
+    main()
