@@ -32,7 +32,7 @@ COLOR_DRIVING = Color.GREEN
 COLOR_PARKING_ENABLED = Color.YELLOW
 COLOR_PARKING = Color.YELLOW
 COLOR_UNPARKING = Color.GREEN
-COLOR_PARKED = Color.YELLOW
+COLOR_PARKED = Color.ORANGE
 COLOR_WAITING = Color.RED
 COLOR_BOTH_PARKED = Color.RED
 COLOR_REVERSED = Color.GREEN
@@ -103,11 +103,7 @@ def follow_line_straight(color_left, color_right, color_base, sensor, steering_o
     drive_robot((0,0))
     wait(1000)
 
-    drive_robot((BASE_VELOCITY, BASE_VELOCITY))
-    while True:
-        if sensor_on_line(color_base, sensor):
-            break
-    drive_robot((0, 0))
+    stop_on_line(color_base, sensor, (BASE_VELOCITY,BASE_VELOCITY))
 
 
 def stop_before_line(color_line, color_base, sensor, velocity):
@@ -150,7 +146,7 @@ def calibrate():
     return color_left, color_right
 
 
-def sensor_on_line(color_line, sensor, limit=2):
+def sensor_on_line(color_line, sensor, limit=4):
     """Returns true if sensor is on the line"""
     return abs(sensor.reflection()-color_line) < limit
 
@@ -180,10 +176,10 @@ def park(color_line, color_base, parking_sensor):
     follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset, PARK_LIMIT)
 
 
-def empty_parking_spot(color_line, parking_sensor):
+def empty_parking_spot(color_line, driving_sensor):
     """Returns true if the parking spot is empty"""
     velocity = (180, -180)
-    if parking_sensor == left_light:
+    if driving_sensor == right_light:
         velocity = (-180, 180)
 
     drive_robot(velocity)
@@ -192,19 +188,17 @@ def empty_parking_spot(color_line, parking_sensor):
         wait(30)
         distances.append(obstacle_sensor.distance())
 
-    stop_on_line(color_line, parking_sensor, (velocity[1], velocity[0]))
+    stop_on_line(color_line, driving_sensor, (velocity[1], velocity[0]))
     return min(distances) > 210
 
 
 def parking_mode(color_line, color_base, driving_sensor, parking_sensor):
     """Attempts to park and unpark the robot. Returns False if parking spot is occupied"""
-    parking_empty = empty_parking_spot(color_line, parking_sensor)
-
-    if parking_empty:
+    if empty_parking_spot(color_line, driving_sensor):
         park(color_line, color_base, parking_sensor)
         ev3.light.on(COLOR_PARKED)
 
-        wait(random.randint(1, 7)*1000)
+        wait(1000)
         unpark(color_line, color_base, driving_sensor)
         return True
     return False
@@ -266,7 +260,7 @@ def main():
 
     timer = time.time()
     reversed_timer = time.time()
-    reversed_limit = random.randint(40, 60)
+    reversed_limit = random.randint(400, 600)
 
     while True:
         follow_line(color_left, color_right, driving_sensor, steering_offset, True)
@@ -291,10 +285,12 @@ def main():
             parking_enabled = False
 
         # Enable parking
-        if time.time() - timer > 15 and not parking_enabled and not reverse_mode:
+        if time.time() - timer > 3 and not parking_enabled and not reverse_mode:
             parking_enabled = True
             ev3.light.on(COLOR_PARKING_ENABLED)
 
 
 if __name__ == '__main__':
-    main()
+    #main()
+    rotate180()
+    #test()

@@ -33,7 +33,7 @@ COLOR_DRIVING = Color.GREEN
 COLOR_PARKING_ENABLED = Color.YELLOW
 COLOR_PARKING = Color.YELLOW
 COLOR_UNPARKING = Color.GREEN
-COLOR_PARKED = Color.YELLOW
+COLOR_PARKED = Color.ORANGE
 COLOR_WAITING = Color.RED
 COLOR_BOTH_PARKED = Color.RED
 COLOR_REVERSED = Color.GREEN
@@ -101,14 +101,7 @@ def follow_line_straight(color_left, color_right, color_base, sensor, steering_o
     while time.time() - parking_timer < limit:
         follow_line(color_left, color_right, sensor, steering_offset, False)
 
-    drive_robot((0,0))
-    wait(1000)
-
-    drive_robot((BASE_VELOCITY, BASE_VELOCITY))
-    while True:
-        if sensor_on_line(color_base, sensor):
-            break
-    drive_robot((0, 0))
+    stop_on_line(color_base, sensor, (BASE_VELOCITY, BASE_VELOCITY))
 
 
 def stop_before_line(color_line, color_base, sensor, velocity):
@@ -151,7 +144,7 @@ def calibrate():
     return color_left, color_right
 
 
-def sensor_on_line(color_line, sensor, limit=2):
+def sensor_on_line(color_line, sensor, limit=4):
     """Returns true if sensor is on the line"""
     return abs(sensor.reflection()-color_line) < limit
 
@@ -189,23 +182,10 @@ def park(color_line, color_base, parking_sensor):
     follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset, PARK_LIMIT)
 
 
-def empty_parking_spot_old():
-    drive_robot(velocity_fn(-1, 150, -1))
-    distances = []
-    for i in range(13):
-        wait(100)
-        distances.append(obstacle_sensor.distance())
-
-    drive_robot(velocity_fn(1, 150, -1))
-    wait(1300)
-    distance = min(distances)
-    return distance > 210
-
-
-def empty_parking_spot(color_line, parking_sensor):
+def empty_parking_spot(color_line, driving_sensor):
     """Returns true if the parking spot is empty"""
     velocity = (180, -180)
-    if parking_sensor == left_light:
+    if driving_sensor == right_light:
         velocity = (-180, 180)
 
     drive_robot(velocity)
@@ -214,16 +194,13 @@ def empty_parking_spot(color_line, parking_sensor):
         wait(30)
         distances.append(obstacle_sensor.distance())
 
-    stop_on_line(color_line, parking_sensor, (velocity[1], velocity[0]))
+    stop_on_line(color_line, driving_sensor, (velocity[1], velocity[0]))
     return min(distances) > 210
 
 
 def parking_mode(color_line, color_base, driving_sensor, parking_sensor, mbox):
     """Attempts to park and unpark the robot. Returns False if parking spot is occupied"""
-    parking_empty = empty_parking_spot(color_line, parking_sensor)
-    #parking_empty = empty_parking_spot_old()
-
-    if parking_empty:
+    if empty_parking_spot(color_line, driving_sensor):
         park(color_line, color_base, parking_sensor)
         ev3.light.on(COLOR_PARKED)
 
@@ -252,7 +229,7 @@ def connect():
 # Reverse
 def reverse(mode, mbox):
     """Sets new values when reversing"""
-    reversed_limit = random.randint(40, 60)
+    reversed_limit = random.randint(50, 70)
     reverse_mode = False 
     if mode == DRIVING_MODE:
         ev3.light.on(COLOR_DRIVING)
@@ -260,37 +237,9 @@ def reverse(mode, mbox):
     else:
         mbox.send(MSG_ROTATE)
         ev3.light.on(COLOR_REVERSED)
-        reversed_limit = random.randint(5, 14)
+        reversed_limit = random.randint(6, 14)
         reverse_mode = True
     return reversed_limit, reverse_mode
-
-
-def test():
-    PAUSE = 100
-    ev3.light.on(Color.YELLOW)
-    wait(PAUSE)
-    ev3.light.on(Color.BLACK)
-    wait(PAUSE)
-    ev3.light.on(Color.RED)
-    wait(PAUSE)
-    ev3.light.on(Color.BLUE)
-    wait(PAUSE)
-    ev3.light.on(Color.WHITE)
-    wait(PAUSE)
-    ev3.light.on(Color.GREEN)
-    wait(PAUSE)
-    ev3.light.on(Color.ORANGE)
-    wait(PAUSE)
-    ev3.light.on(Color.BROWN)
-    wait(PAUSE)
-    ev3.light.on(Color.CYAN)
-    wait(PAUSE)
-    ev3.light.on(Color.GRAY)
-    wait(PAUSE)
-    ev3.light.on(Color.MAGENTA)
-    wait(PAUSE)
-    ev3.light.on(Color.VIOLET)
-    wait(PAUSE)
 
 
 def main():
@@ -340,6 +289,4 @@ def main():
 
 
 if __name__ == '__main__':
-    #main()
-    #rotate180()
-    test()
+    main()
