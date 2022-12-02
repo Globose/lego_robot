@@ -40,8 +40,8 @@ COLOR_REVERSED = Color.GREEN
 # Driving definitions
 DRIVING_MODE = -1
 BASE_VELOCITY = 200
-PARK_LIMIT = 4
-UNPARK_LIMIT = 3
+PARK_LIMIT = 5
+UNPARK_LIMIT = 2.5
 
 
 # Driving
@@ -57,7 +57,7 @@ def norm(color_left, color_right, color_current):
     """Returns a number between -1 and 1 indicating turn rate"""
     t = (color_current-min(color_left, color_right)-.5*abs(color_left-color_right))
     t = (2*t)/(color_left-color_right)
-    t = 0.88*(t**3+t)/2
+    t = (t**3+t)/2
     return t
 
 
@@ -77,9 +77,9 @@ def drive_robot(velocity):
 def rotate180():
     """Rotates robot 180 deg"""
     drive_robot((200,200))
-    wait(1000)
+    wait(1500)
     drive_robot((-200,200))
-    wait(2520)
+    wait(1950)
     drive_robot((0,0))
 
 
@@ -146,7 +146,7 @@ def calibrate():
     return color_left, color_right
 
 
-def sensor_on_line(color_line, sensor, limit=4):
+def sensor_on_line(color_line, sensor, limit=15):
     """Returns true if sensor is on the line"""
     return abs(sensor.reflection()-color_line) < limit
 
@@ -172,7 +172,7 @@ def park(color_line, color_base, parking_sensor):
     if parking_sensor == right_light:
         color_left, color_right, steering_offset = color_base, color_line, 1
 
-    stop_on_line(color_base, parking_sensor, (BASE_VELOCITY,BASE_VELOCITY))
+    stop_on_line(color_base, parking_sensor, (BASE_VELOCITY, BASE_VELOCITY))
     follow_line_straight(color_left, color_right, color_base, parking_sensor, steering_offset, PARK_LIMIT)
 
 
@@ -184,12 +184,12 @@ def empty_parking_spot(color_line, driving_sensor):
 
     drive_robot(velocity)
     distances = []
-    for i in range(12):
+    for i in range(22):
         wait(30)
         distances.append(obstacle_sensor.distance())
 
-    stop_on_line(color_line, driving_sensor, (velocity[1], velocity[0]))
-    return min(distances) > 210
+    stop_on_line(color_line, driving_sensor, (0.5*velocity[1], 0.5*velocity[0]))
+    return min(distances) > 200
 
 
 def parking_mode(color_line, color_base, driving_sensor, parking_sensor):
@@ -219,7 +219,7 @@ def reverse(mode):
 
 
 def test():
-    PAUSE = 100
+    PAUSE = 500
     ev3.light.on(Color.YELLOW)
     wait(PAUSE)
     ev3.light.on(Color.BLACK)
@@ -291,6 +291,6 @@ def main():
 
 
 if __name__ == '__main__':
-    #main()
-    rotate180()
-    #test()
+    main()
+
+    
